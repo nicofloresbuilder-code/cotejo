@@ -7,8 +7,9 @@ Un *payer-and-value test*: antes de que un dueño de negocio mexicano mande un a
 
 ## Estado
 
-📋 Packet listo — ver [`docs/PACKET.md`](docs/PACKET.md).
-🧑‍💻 Build: pendiente.
+📋 Packet listo — ver [`docs/PACKET.md`](docs/PACKET.md), mockup en [`docs/mockup.png`](docs/mockup.png).
+🤖 Implementation prompt listo — ver [`BUILD_PROMPT.md`](BUILD_PROMPT.md).
+🧑‍💻 Build: pendiente (arranca en Commit 1 de `BUILD_PROMPT.md`).
 
 ## Stack (planeado)
 
