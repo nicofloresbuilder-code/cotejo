@@ -47,3 +47,18 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 - `npm run build` y `npm run lint` limpios. Probado visualmente en viewport móvil (375×812): el botón de login no rompe el layout del mockup.
 
 **Próximo paso:** configurar el proveedor de Google en Supabase Auth (necesita un OAuth client de Google Cloud) para que el botón de login funcione de extremo a extremo. Después: Commit 3 (subida y validación de evidencias).
+
+## Sesión 3 — 2026-08-28
+
+**Qué se decidió:**
+- Google Sign-in queda pendiente a propósito (decisión de Nicolás) — se sigue con Commit 3 sin bloquear en eso.
+- `src/lib/validarEvidencias.ts`: función pura (tipo permitido, tamaño máx. 5MB, entre 2 y 4 archivos) + `validarEvidencias.test.ts` (6 casos, `node --experimental-strip-types --test`, agregado como script `npm test`). `tsconfig.json` excluye `**/*.test.ts` del build de Next — los imports con extensión `.ts` que pide la resolución nativa de Node chocaban con el type-check de `next build`.
+- **Se evaluó y se descartó `image-size`** para validar dimensiones mínimas de imagen (lo que pedía el piso de seguridad #4 literalmente): tiene una vulnerabilidad de severidad alta sin parche (DoS por loop infinito parseando ICNS/JXL/HEIF disfrazados de PNG/JPEG — justo el escenario de un archivo hostil con extensión falsa). Se desinstaló; la validación se queda en tipo + tamaño, que es lo que de verdad exige el criterio de aceptación del ship. Documentado como trade-off deliberado, no como pendiente.
+- `next.config.ts`: `serverActions.bodySizeLimit` subido a 25mb para que un archivo de prueba de 20MB llegue completo al server action y lo rechace nuestra validación (mensaje claro) en vez de que Next lo tumbe con un 413 genérico antes.
+- `CotejoUpload.tsx` (client component) reemplaza la cuadrícula estática de miniaturas en `/`: subida real de 2-4 archivos, validación en cliente Y en servidor (server action `subirEvidencias`, que no persiste nada), estado de éxito/error inline. La tabla de ejemplo de abajo se dejó intacta pero renombrada "Vista previa · EJEMPLO" para que no se lea como si estuviera conectada a lo que se acaba de subir — el cotejo real todavía no existe (Commit 5).
+
+**Verificado:**
+- 6/6 tests de `validarEvidencias` pasan. `npm run build` y `npm run lint` limpios.
+- End-to-end en el navegador (archivos simulados por JS, ya que este entorno no tiene diálogo nativo de OS): 4 archivos válidos → "✓ 4 evidencias válidas"; 1 archivo de 6MB + 1 `.exe` → rechazados con el mismo mensaje en cliente y en servidor (confirmado por log: dos llamadas a `subirEvidencias`, ambas 200, sin crash).
+
+**Próximo paso:** Commit 4 — extracción con visión (API de Anthropic, un documento a la vez, con defensa contra inyección por imagen). Necesito que consigas una `ANTHROPIC_API_KEY` (console.anthropic.com) cuando sigamos con eso.

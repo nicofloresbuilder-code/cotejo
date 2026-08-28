@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { EstadoPill } from "@/components/EstadoPill";
-import { CardIcon, DocIcon, PersonIcon } from "@/components/DocIcon";
 import { AuthButton } from "@/components/AuthButton";
+import { CotejoUpload } from "@/components/CotejoUpload";
 
-// Commit 1: layout estático que replica docs/mockup.png, sin lógica todavía.
-// Los datos de abajo son de EJEMPLO — Commits 3-6 los reemplazan por
-// subida real + visión + el motor de cotejo (ver BUILD_PROMPT.md).
-
-const evidencias = [
-  { label: "Cotización", Icon: DocIcon },
-  { label: "Constancia", Icon: DocIcon },
-  { label: "Perfil", Icon: PersonIcon },
-  { label: "CLABE", Icon: CardIcon },
-];
+// Commit 3: la subida de arriba (<CotejoUpload />) ya es real — valida tipo
+// y tamaño en cliente y servidor, sin persistir nada. La tabla de abajo
+// sigue siendo la vista previa estática del mockup: la lectura con IA
+// (Commit 4) y el motor de cotejo real (Commit 5) todavía no existen.
 
 const campos = [
   {
@@ -59,23 +53,12 @@ export default function CotejoPage() {
       </header>
 
       <div className="flex flex-1 flex-col gap-4 px-5 pt-3.5">
-        <section className="flex flex-col gap-1.5">
-          <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
-            4 evidencias subidas
-          </h2>
-          <div className="grid grid-cols-4 gap-1.5">
-            {evidencias.map(({ label, Icon }) => (
-              <div key={label} className="flex flex-col items-center gap-1">
-                <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-border bg-gray-50">
-                  <Icon />
-                </div>
-                <span className="text-center text-[9px] font-semibold text-muted">{label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        <CotejoUpload />
 
         <section className="flex flex-col gap-1.5">
+          <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
+            Vista previa · EJEMPLO
+          </h2>
           {campos.map((campo) => (
             <div
               key={campo.nombre}

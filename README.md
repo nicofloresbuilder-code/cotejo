@@ -9,7 +9,7 @@ Un *payer-and-value test*: antes de que un dueño de negocio mexicano mande un a
 
 📋 Packet listo — ver [`docs/PACKET.md`](docs/PACKET.md), mockup en [`docs/mockup.png`](docs/mockup.png).
 🤖 Implementation prompt listo — ver [`BUILD_PROMPT.md`](BUILD_PROMPT.md).
-🧑‍💻 Build: Commit 1 y 2 hechos (scaffold + Supabase/Auth wiring). Live: **https://cotejo-psi.vercel.app**
+🧑‍💻 Build: Commits 1-3 hechos (scaffold + Supabase/Auth wiring + subida y validación real de evidencias). Live: **https://cotejo-psi.vercel.app**
 📓 Bitácora de sesiones: [`DECISIONS.md`](DECISIONS.md).
 
 ## Stack (planeado)
