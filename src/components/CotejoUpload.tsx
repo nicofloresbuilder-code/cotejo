@@ -2,8 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import { leerEvidencias, type LeerEvidenciasResultado } from "@/app/actions/leerEvidencias";
+import { guardarEventoValor } from "@/app/actions/guardarEventoValor";
+import { ACCIONES, DISPOSICIONES_PAGO, type Accion, type DisposicionPago } from "@/lib/eventoValor";
 import { MAX_EVIDENCIAS, TIPOS_PERMITIDOS } from "@/lib/validarEvidencias";
 import { cotejarDocumentos, CAMPOS_CANONICOS, type ResultadoCampo } from "@/lib/cotejo/cotejarDocumentos";
+import { generarMensajeWhatsApp } from "@/lib/mensajes/generarMensajeWhatsApp";
 import { EstadoPill } from "@/components/EstadoPill";
 import { DocIcon } from "@/components/DocIcon";
 
@@ -13,6 +16,20 @@ const ETIQUETAS_CAMPO: Record<string, string> = {
   titular_cuenta: "Titular de la cuenta",
   domicilio: "Domicilio",
   telefono: "Teléfono",
+};
+
+const ETIQUETA_ACCION: Record<Accion, string> = {
+  pague: "Pagué",
+  pedi_mas_evidencia: "Pedí más evidencia",
+  pague_distinto: "Pagué, pero algo cambió",
+  no_pague: "No pagué",
+};
+
+const ETIQUETA_DISPOSICION: Record<DisposicionPago, string> = {
+  gratis: "Nada, debería ser gratis",
+  menos_de_50: "Menos de $50 MXN",
+  "50_a_200": "Entre $50 y $200 MXN",
+  mas_de_200: "Más de $200 MXN",
 };
 
 // El mismo ejemplo estático de docs/mockup.png — se muestra antes de que
@@ -43,6 +60,9 @@ const EJEMPLO: Record<string, ResultadoCampo> = {
   },
   telefono: { estado: "sin_evidencia", valores: [] },
 };
+
+const MENSAJE_EJEMPLO =
+  '"Antes de pasar el anticipo, ¿me confirmas el RFC y el teléfono a los que sale la factura? Solo para tener todo parejo de mi lado."';
 
 function FilaCampo({ campo, resultado }: { campo: string; resultado: ResultadoCampo }) {
   return (
@@ -80,20 +100,36 @@ function FilaCampo({ campo, resultado }: { campo: string; resultado: ResultadoCa
   );
 }
 
-// Commit 5: flujo completo — sube, valida, lee con visión y COTEJA de
-// verdad. Antes de subir nada muestra el ejemplo estático del mockup;
-// en cuanto hay un resultado real de leerEvidencias, lo reemplaza con la
-// comparación real de cotejarDocumentos().
+// Commit 6: flujo completo de principio a fin — sube, valida, lee con
+// visión, coteja, genera el mensaje para pedir lo que falta, y deja que
+// el usuario declare qué hizo después. Esa declaración (+ tiempo real,
+// distribución de estados, disposición a pagar) es el dato que alimenta
+// el tablero de valor — anónimo, sin nada de la contraparte.
 export function CotejoUpload() {
   const [archivos, setArchivos] = useState<File[]>([]);
   const [erroresCliente, setErroresCliente] = useState<string[]>([]);
   const [resultado, setResultado] = useState<LeerEvidenciasResultado | null>(null);
+  const [montoInput, setMontoInput] = useState("");
   const [enviando, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const inicioRef = useRef<number | null>(null);
+
+  const [copiado, setCopiado] = useState(false);
+  const [accionSeleccionada, setAccionSeleccionada] = useState<Accion | null>(null);
+  const [eventoGuardado, setEventoGuardado] = useState(false);
+  const [errorEvento, setErrorEvento] = useState<string | null>(null);
+  const [guardandoEvento, startTransitionEvento] = useTransition();
+
+  function reiniciarDeclaracion() {
+    setAccionSeleccionada(null);
+    setEventoGuardado(false);
+    setErrorEvento(null);
+  }
 
   function agregarArchivos(nuevos: FileList | null) {
     if (!nuevos) return;
     setResultado(null);
+    reiniciarDeclaracion();
     const cupo = MAX_EVIDENCIAS - archivos.length;
     const elegidos = Array.from(nuevos).slice(0, cupo);
 
@@ -112,10 +148,13 @@ export function CotejoUpload() {
 
   function quitarArchivo(i: number) {
     setResultado(null);
+    reiniciarDeclaracion();
     setArchivos((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function cotejar() {
+    if (inicioRef.current === null) inicioRef.current = Date.now();
+    reiniciarDeclaracion();
     const formData = new FormData();
     archivos.forEach((f) => formData.append("evidencias", f));
     startTransition(async () => {
@@ -137,9 +176,69 @@ export function CotejoUpload() {
         )
       : null;
 
+  const mensaje = resultadoCotejo ? generarMensajeWhatsApp(resultadoCotejo) : MENSAJE_EJEMPLO;
+
+  async function copiarMensaje() {
+    if (!mensaje) return;
+    try {
+      await navigator.clipboard.writeText(mensaje);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Portapapeles bloqueado (permiso del navegador) — el texto sigue
+      // visible en pantalla para copiar a mano.
+    }
+  }
+
+  function elegirDisposicion(disposicion: DisposicionPago) {
+    if (!resultadoCotejo || !accionSeleccionada) return;
+
+    const distribucion = { coincide: 0, contradice: 0, sin_evidencia: 0 };
+    for (const campo of CAMPOS_CANONICOS) distribucion[resultadoCotejo[campo].estado]++;
+
+    startTransitionEvento(async () => {
+      // Date.now() vive aquí adentro (no antes de startTransition) para
+      // que quede claramente fuera de cualquier ruta de render.
+      const tiempoSegundos = inicioRef.current
+        ? Math.round((Date.now() - inicioRef.current) / 1000)
+        : 0;
+      const montoMxn =
+        montoInput.trim() !== "" && !Number.isNaN(Number(montoInput)) ? Number(montoInput) : null;
+
+      const r = await guardarEventoValor({
+        montoMxn,
+        tiempoSegundos,
+        nEvidencias: archivos.length,
+        distribucion,
+        accion: accionSeleccionada,
+        disposicionPago: disposicion,
+      });
+      if (r.ok) {
+        setEventoGuardado(true);
+      } else {
+        setErrorEvento(r.error ?? "No se pudo guardar el evento.");
+      }
+    });
+  }
+
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
+            Monto del anticipo (opcional)
+          </span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            placeholder="$ MXN"
+            value={montoInput}
+            onChange={(e) => setMontoInput(e.target.value)}
+            className="rounded-lg border border-border px-2.5 py-2 text-[12.5px] outline-none focus:border-accent"
+          />
+        </label>
+
         <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
           {archivos.length} de {MAX_EVIDENCIAS} evidencias
         </h2>
@@ -223,6 +322,74 @@ export function CotejoUpload() {
           <FilaCampo key={campo} campo={campo} resultado={(resultadoCotejo ?? EJEMPLO)[campo]} />
         ))}
       </section>
+
+      <div className="flex flex-col gap-1.5 rounded-[10px] border border-border bg-gray-50 p-3">
+        <h3 className="text-[12.5px] font-bold">Pídele esto</h3>
+        {mensaje ? (
+          <>
+            <p className="text-[10.5px] leading-snug text-muted">&ldquo;{mensaje}&rdquo;</p>
+            <button
+              type="button"
+              onClick={copiarMensaje}
+              disabled={!resultadoCotejo}
+              className="mt-0.5 rounded-lg bg-accent px-3.5 py-2.5 text-[12.5px] font-semibold text-white disabled:opacity-40"
+            >
+              {copiado ? "Copiado ✓" : "Copiar para WhatsApp"}
+            </button>
+          </>
+        ) : (
+          <p className="text-[10.5px] leading-snug text-emerald-700">
+            Todo coincide — no hace falta pedir nada más.
+          </p>
+        )}
+      </div>
+
+      {resultadoCotejo && !eventoGuardado && (
+        <div className="flex flex-col gap-2 rounded-[10px] border border-border p-3">
+          {!accionSeleccionada ? (
+            <>
+              <h3 className="text-[12.5px] font-bold">¿Qué hiciste?</h3>
+              <div className="grid grid-cols-2 gap-1.5">
+                {ACCIONES.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAccionSeleccionada(a)}
+                    className="rounded-lg border border-border px-2 py-2 text-[11px] font-semibold text-muted hover:border-accent hover:text-accent"
+                  >
+                    {ETIQUETA_ACCION[a]}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="text-[12.5px] font-bold">¿Cuánto pagarías por este cotejo?</h3>
+              <div className="flex flex-col gap-1.5">
+                {DISPOSICIONES_PAGO.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={guardandoEvento}
+                    onClick={() => elegirDisposicion(d)}
+                    className="rounded-lg border border-border px-2.5 py-2 text-left text-[11px] font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-40"
+                  >
+                    {ETIQUETA_DISPOSICION[d]}
+                  </button>
+                ))}
+              </div>
+              {guardandoEvento && <p className="text-[10px] text-muted-2">Guardando…</p>}
+              {errorEvento && <p className="text-[10px] text-red-700">{errorEvento}</p>}
+            </>
+          )}
+        </div>
+      )}
+
+      {eventoGuardado && (
+        <div className="rounded-[10px] border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
+          Gracias — esto alimenta el tablero de valor, sin ningún dato de la contraparte.
+        </div>
+      )}
     </section>
   );
 }

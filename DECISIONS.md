@@ -99,3 +99,19 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 - 22/22 tests, build y lint limpios. Fixtures de prueba borradas, nunca llegaron al repo.
 
 **Próximo paso:** Commit 6 — mensaje "Pídele esto" generado de verdad a partir de los campos en `contradice`/`sin_evidencia` (ahora mismo sigue siendo el texto fijo del mockup), botón "Copiar para WhatsApp" funcional, declarar la acción siguiente, e insertar el evento anónimo en `value_events`.
+
+## Sesión 6 — 2026-08-28
+
+**Qué se decidió:**
+- `src/lib/mensajes/generarMensajeWhatsApp.ts`: función pura — separa campos en `sin_evidencia` (pide "compartir") de `contradice` (pide "confirmar cuál es correcto", mencionando que vio datos distintos), nunca lenguaje acusatorio. Regresa `null` cuando todo coincide (nada que pedir). 5 tests, incluido uno que verifica explícitamente que el mensaje nunca contiene palabras tipo "sospecha", "riesgo", "fraude" — la cláusula sombra convertida en test, no solo en intención.
+- **Se encontró y arregló un bug real de arquitectura de Next.js**: un archivo `"use server"` solo puede exportar funciones async — `guardarEventoValor.ts` exportaba también `ACCIONES` y `DISPOSICIONES_PAGO` como arrays, lo cual tronaba en runtime ("A 'use server' file can only export async functions, found object"). Se movieron esas constantes + los tipos compartidos a `src/lib/eventoValor.ts`, y `guardarEventoValor.ts` quedó exportando solo la función. Encontrado corriendo el flujo real en el navegador, no por lint ni build (ninguno de los dos lo cachó).
+- **Bug de testing, no de producto**: `allowImportingTsExtensions: true` en `tsconfig.json` (junto con el `noEmit` que ya teníamos) reemplaza el hack anterior de excluir `**/*.test.ts` del build — ahora los imports relativos pueden llevar `.ts` en cualquier archivo (lo necesitaba `generarMensajeWhatsApp.ts`, que importa de `cotejarDocumentos.ts` y corre tanto bajo Next como bajo `node --test`).
+- `guardarEventoValor` usa el cliente admin (service role) porque `value_events` no tiene policy de insert para el cliente normal — a propósito, así ese insert solo puede pasar desde el servidor.
+- El "tiempo real" del evento se mide desde el primer click en "Cotejar" (arranca `inicioRef`) hasta que se declara la disposición a pagar — documentado como una decisión de qué cuenta como "tiempo del cotejo", discutible pero razonable.
+- `Date.now()` se movió adentro del callback de `startTransition` en vez de calcularse antes — la nueva regla de lint `react-hooks/purity` (React Compiler) marca cualquier llamada impura fuera de un callback async como sospechosa de correr durante el render.
+
+**Verificado — con la API real, no mockeada:**
+- Flujo completo en el navegador: 2 documentos sin campos en común (todo cae en `sin_evidencia`) → el mensaje generado combinó los 5 campos correctamente ("¿me compartes tu razón social, RFC, titular de la cuenta, domicilio y teléfono?..."). Se declaró "Pedí más evidencia" → "Entre $50 y $200 MXN" → **se confirmó la fila nueva en `value_events` vía la API REST de Supabase**: `monto_mxn: 38000`, `tiempo_segundos: 128` (real, no inventado), `distribucion: {sin_evidencia: 5}`, `accion: "pedi_mas_evidencia"`, `disposicion_pago: "50_a_200"` — **cero campos identificables de la contraparte**. Test #10 del packet confirmado.
+- 27/27 tests, build y lint limpios.
+
+**Próximo paso:** Commit 7 — tablero de valor real en `/tablero` (leer agregados de `value_events` y `delivery_models`, nada hardcodeado), guardar un cotejo con Google Sign-in (`checks`, RLS), y deploy 2.
