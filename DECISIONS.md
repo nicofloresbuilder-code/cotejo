@@ -84,3 +84,18 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 - Probar la inyección con el modelo real (no solo con un test unitario del parser) importa porque la defensa real vive en el prompt + el comportamiento del modelo, no en `parsearRespuestaVision` — ese solo protege contra una respuesta malformada, no contra que el modelo sea engañado.
 
 **Próximo paso:** Commit 5 — el motor de cotejo (`cotejarDocumentos`, comparar estos campos extraídos entre documentos) + wire a la tabla real de la UI, reemplazando por fin la "Vista previa · EJEMPLO".
+
+## Sesión 5 — 2026-08-28
+
+**Qué se decidió:**
+- `src/lib/cotejo/cotejarDocumentos.ts`: función pura, tal cual el diseño de `BUILD_PROMPT.md` — 5 campos canónicos (`razon_social`, `rfc`, `titular_cuenta`, `domicilio`, `telefono`), normalización (mayúsculas, sin acentos, espacios colapsados), y la regla "menos de 2 fuentes = sin_evidencia" ya documentada en la Sesión 3. 8 tests nuevos (22/22 en total).
+- `CotejoUpload.tsx` ahora es el flujo completo: sube → valida → lee con visión → **coteja de verdad**. El ejemplo estático del mockup se quedó, pero movido adentro del componente como valor por default (mismo tipo `ResultadoCampo` que el motor real, para que el cambio de "ejemplo" a "real" sea un simple swap de objeto, no dos JSX distintos). El label de la sección cambia solo: "Vista previa · EJEMPLO" antes de cotejar, "Resultado del cotejo" después.
+- Mensaje de `sin_evidencia` se hizo más honesto que el mockup original: si el campo tiene exactamente 1 fuente (no 0), ahora dice `Solo aparece en "archivo.png" — no es una señal negativa` en vez del genérico "No aparece en lo subido" — porque sí aparece, nada más no está corroborado.
+- `page.tsx` perdió la tabla estática que tenía desde el Commit 1 — ya no hace falta, vive dentro de `CotejoUpload`.
+
+**Verificado — con la API real:**
+- 3 documentos de prueba nuevos (Playwright, marca EJEMPLO, datos inventados): una cotización y una constancia con la MISMA razón social y domicilio pero **RFC distinto a propósito** (para forzar un contradice real), más una captura de CLABE que solo trae titular y teléfono.
+- Resultado real de extremo a extremo: Razón social → Coincide (2 fuentes). RFC → **Contradice**, mostrando los dos valores literales con su archivo de origen. Titular de la cuenta → Sin evidencia, con el mensaje "Solo aparece en...". Domicilio → Coincide. Teléfono → Sin evidencia. Exactamente la distribución del mockup (2 coincide / 1 contradice / 2 sin evidencia), pero con datos reales pasando por visión + el motor de cotejo, no hardcodeado.
+- 22/22 tests, build y lint limpios. Fixtures de prueba borradas, nunca llegaron al repo.
+
+**Próximo paso:** Commit 6 — mensaje "Pídele esto" generado de verdad a partir de los campos en `contradice`/`sin_evidencia` (ahora mismo sigue siendo el texto fijo del mockup), botón "Copiar para WhatsApp" funcional, declarar la acción siguiente, e insertar el evento anónimo en `value_events`.

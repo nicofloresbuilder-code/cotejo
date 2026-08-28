@@ -3,27 +3,87 @@
 import { useRef, useState, useTransition } from "react";
 import { leerEvidencias, type LeerEvidenciasResultado } from "@/app/actions/leerEvidencias";
 import { MAX_EVIDENCIAS, TIPOS_PERMITIDOS } from "@/lib/validarEvidencias";
-import { CAMPOS_ENTIDAD } from "@/lib/vision/entidades";
+import { cotejarDocumentos, CAMPOS_CANONICOS, type ResultadoCampo } from "@/lib/cotejo/cotejarDocumentos";
+import { EstadoPill } from "@/components/EstadoPill";
 import { DocIcon } from "@/components/DocIcon";
 
 const ETIQUETAS_CAMPO: Record<string, string> = {
   razon_social: "Razón social",
-  nombre_persona_fisica: "Nombre (persona física)",
   rfc: "RFC",
-  clabe: "CLABE",
-  banco: "Banco",
   titular_cuenta: "Titular de la cuenta",
   domicilio: "Domicilio",
   telefono: "Teléfono",
-  regimen_fiscal: "Régimen fiscal",
-  folio: "Folio",
-  monto: "Monto",
 };
 
-// Commit 4: subida real + validación real + LECTURA REAL con la API de
-// Anthropic (un documento a la vez). Todavía NO existe el motor de cotejo
-// que compara los campos entre documentos — eso es Commit 5. Por ahora
-// esto muestra, honestamente, lo que el modelo extrajo de cada documento.
+// El mismo ejemplo estático de docs/mockup.png — se muestra antes de que
+// el usuario suba nada, con la misma forma (ResultadoCampo) que el motor
+// de cotejo real, para que el cambio de "ejemplo" a "real" sea invisible.
+const EJEMPLO: Record<string, ResultadoCampo> = {
+  razon_social: {
+    estado: "coincide",
+    valores: [
+      { fuente: "cotización", valor: "Tarimas del Bajío SA de CV" },
+      { fuente: "constancia", valor: "Tarimas del Bajío SA de CV" },
+    ],
+  },
+  rfc: { estado: "sin_evidencia", valores: [] },
+  titular_cuenta: {
+    estado: "contradice",
+    valores: [
+      { fuente: "cotización", valor: "Tarimas del Bajío SA de CV" },
+      { fuente: "CLABE", valor: "Juan Carlos Ramírez López" },
+    ],
+  },
+  domicilio: {
+    estado: "coincide",
+    valores: [
+      { fuente: "cotización", valor: "Av. Insurgentes Sur 1234, CDMX" },
+      { fuente: "constancia", valor: "Av. Insurgentes Sur 1234, CDMX" },
+    ],
+  },
+  telefono: { estado: "sin_evidencia", valores: [] },
+};
+
+function FilaCampo({ campo, resultado }: { campo: string; resultado: ResultadoCampo }) {
+  return (
+    <div
+      className={`flex flex-col gap-1 rounded-[9px] border px-2.5 py-2 ${
+        resultado.estado === "contradice" ? "border-amber-200 bg-amber-50" : "border-border"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-semibold">{ETIQUETAS_CAMPO[campo]}</span>
+        <EstadoPill estado={resultado.estado} />
+      </div>
+
+      {resultado.estado === "contradice" &&
+        resultado.valores.map((v) => (
+          <span key={v.fuente} className="text-[10.5px] text-amber-800">
+            {v.fuente}: {v.valor}
+          </span>
+        ))}
+
+      {resultado.estado === "coincide" && (
+        <span className="text-[10.5px] text-muted">
+          {resultado.valores[0].valor} — {resultado.valores.map((v) => v.fuente).join(", ")}
+        </span>
+      )}
+
+      {resultado.estado === "sin_evidencia" && (
+        <span className="text-[10.5px] italic text-muted-2">
+          {resultado.valores.length === 0
+            ? "No aparece en lo subido — no es una señal negativa"
+            : `Solo aparece en "${resultado.valores[0].fuente}" — no es una señal negativa`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Commit 5: flujo completo — sube, valida, lee con visión y COTEJA de
+// verdad. Antes de subir nada muestra el ejemplo estático del mockup;
+// en cuanto hay un resultado real de leerEvidencias, lo reemplaza con la
+// comparación real de cotejarDocumentos().
 export function CotejoUpload() {
   const [archivos, setArchivos] = useState<File[]>([]);
   const [erroresCliente, setErroresCliente] = useState<string[]>([]);
@@ -67,123 +127,102 @@ export function CotejoUpload() {
   const slots = Array.from({ length: MAX_EVIDENCIAS }, (_, i) => archivos[i] ?? null);
   const puedeCotejar = archivos.length >= 2 && archivos.length <= MAX_EVIDENCIAS && !enviando;
 
+  const resultadoCotejo =
+    resultado && resultado.ok
+      ? cotejarDocumentos(
+          resultado.documentos.map((d) => ({
+            fuente: d.archivo,
+            campos: Object.fromEntries(CAMPOS_CANONICOS.map((c) => [c, d.entidades[c]])),
+          })),
+        )
+      : null;
+
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
-        {archivos.length} de {MAX_EVIDENCIAS} evidencias
-      </h2>
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
+          {archivos.length} de {MAX_EVIDENCIAS} evidencias
+        </h2>
 
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept={TIPOS_PERMITIDOS.join(",")}
-        className="hidden"
-        onChange={(e) => agregarArchivos(e.target.files)}
-      />
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept={TIPOS_PERMITIDOS.join(",")}
+          className="hidden"
+          onChange={(e) => agregarArchivos(e.target.files)}
+        />
 
-      <div className="grid grid-cols-4 gap-1.5">
-        {slots.map((archivo, i) =>
-          archivo ? (
-            <div key={i} className="flex flex-col items-center gap-1">
-              <div className="relative flex aspect-square w-full items-center justify-center rounded-lg border border-border bg-gray-50">
-                <DocIcon />
-                <button
-                  type="button"
-                  aria-label={`Quitar ${archivo.name}`}
-                  onClick={() => quitarArchivo(i)}
-                  className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
-                >
-                  ×
-                </button>
+        <div className="grid grid-cols-4 gap-1.5">
+          {slots.map((archivo, i) =>
+            archivo ? (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div className="relative flex aspect-square w-full items-center justify-center rounded-lg border border-border bg-gray-50">
+                  <DocIcon />
+                  <button
+                    type="button"
+                    aria-label={`Quitar ${archivo.name}`}
+                    onClick={() => quitarArchivo(i)}
+                    className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white"
+                  >
+                    ×
+                  </button>
+                </div>
+                <span className="max-w-full truncate text-center text-[9px] font-semibold text-muted">
+                  {archivo.name}
+                </span>
               </div>
-              <span className="max-w-full truncate text-center text-[9px] font-semibold text-muted">
-                {archivo.name}
-              </span>
-            </div>
-          ) : (
-            <button
-              key={i}
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-border bg-white text-muted-2"
-            >
-              <span className="text-[18px] leading-none">+</span>
-              <span className="text-[8px] font-semibold">Agregar</span>
-            </button>
-          ),
+            ) : (
+              <button
+                key={i}
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-border bg-white text-muted-2"
+              >
+                <span className="text-[18px] leading-none">+</span>
+                <span className="text-[8px] font-semibold">Agregar</span>
+              </button>
+            ),
+          )}
+        </div>
+
+        {erroresCliente.length > 0 && (
+          <ul className="flex flex-col gap-0.5 rounded-lg bg-red-50 px-2.5 py-2 text-[10px] text-red-700">
+            {erroresCliente.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        )}
+
+        <button
+          type="button"
+          disabled={!puedeCotejar}
+          onClick={cotejar}
+          className="rounded-lg bg-accent px-3.5 py-2.5 text-[12.5px] font-semibold text-white disabled:opacity-40"
+        >
+          {enviando ? "Leyendo con IA…" : "Cotejar"}
+        </button>
+        {archivos.length < 2 && (
+          <p className="text-center text-[10px] text-muted-2">Sube al menos 2 evidencias.</p>
+        )}
+
+        {resultado && !resultado.ok && (
+          <ul className="flex flex-col gap-0.5 rounded-lg bg-red-50 px-2.5 py-2 text-[10px] text-red-700">
+            {resultado.errores.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {erroresCliente.length > 0 && (
-        <ul className="flex flex-col gap-0.5 rounded-lg bg-red-50 px-2.5 py-2 text-[10px] text-red-700">
-          {erroresCliente.map((e) => (
-            <li key={e}>{e}</li>
-          ))}
-        </ul>
-      )}
-
-      <button
-        type="button"
-        disabled={!puedeCotejar}
-        onClick={cotejar}
-        className="rounded-lg bg-accent px-3.5 py-2.5 text-[12.5px] font-semibold text-white disabled:opacity-40"
-      >
-        {enviando ? "Leyendo con IA…" : "Cotejar"}
-      </button>
-      {archivos.length < 2 && (
-        <p className="text-center text-[10px] text-muted-2">Sube al menos 2 evidencias.</p>
-      )}
-
-      {resultado && !resultado.ok && (
-        <ul className="flex flex-col gap-0.5 rounded-lg bg-red-50 px-2.5 py-2 text-[10px] text-red-700">
-          {resultado.errores.map((e) => (
-            <li key={e}>{e}</li>
-          ))}
-        </ul>
-      )}
-
-      {resultado && resultado.ok && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[10px] text-muted-2">
-            Lectura completada. El cotejo real (comparar estos campos entre documentos) llega en
-            el próximo commit — esto es lo que el modelo extrajo de cada uno.
-          </p>
-          {resultado.documentos.map((doc) => {
-            const camposConValor = CAMPOS_ENTIDAD.filter((c) => doc.entidades[c] !== null);
-            return (
-              <div
-                key={doc.archivo}
-                className={`flex flex-col gap-1 rounded-lg border px-2.5 py-2 text-[10.5px] ${
-                  doc.entidades.posible_inyeccion
-                    ? "border-amber-200 bg-amber-50"
-                    : "border-border"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold">{doc.archivo}</span>
-                  {doc.entidades.posible_inyeccion && (
-                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">
-                      Instrucción ignorada
-                    </span>
-                  )}
-                </div>
-                {doc.error && <span className="text-red-700">No se pudo leer: {doc.error}</span>}
-                {!doc.error && camposConValor.length === 0 && (
-                  <span className="italic text-muted-2">No se detectó ningún campo conocido.</span>
-                )}
-                {!doc.error &&
-                  camposConValor.map((c) => (
-                    <div key={c} className="flex justify-between gap-2 text-muted">
-                      <span className="text-muted-2">{ETIQUETAS_CAMPO[c]}</span>
-                      <span className="text-right">{doc.entidades[c]}</span>
-                    </div>
-                  ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <section className="flex flex-col gap-1.5">
+        <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
+          {resultadoCotejo ? "Resultado del cotejo" : "Vista previa · EJEMPLO"}
+        </h2>
+        {CAMPOS_CANONICOS.map((campo) => (
+          <FilaCampo key={campo} campo={campo} resultado={(resultadoCotejo ?? EJEMPLO)[campo]} />
+        ))}
+      </section>
     </section>
   );
 }

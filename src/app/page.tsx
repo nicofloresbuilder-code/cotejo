@@ -1,43 +1,11 @@
 import Link from "next/link";
-import { EstadoPill } from "@/components/EstadoPill";
 import { AuthButton } from "@/components/AuthButton";
 import { CotejoUpload } from "@/components/CotejoUpload";
 
-// Commit 3: la subida de arriba (<CotejoUpload />) ya es real — valida tipo
-// y tamaño en cliente y servidor, sin persistir nada. La tabla de abajo
-// sigue siendo la vista previa estática del mockup: la lectura con IA
-// (Commit 4) y el motor de cotejo real (Commit 5) todavía no existen.
-
-const campos = [
-  {
-    nombre: "Razón social",
-    estado: "coincide" as const,
-    detalle: "Tarimas del Bajío SA de CV — cotización y constancia",
-  },
-  {
-    nombre: "RFC",
-    estado: "sin_evidencia" as const,
-    detalle: "No aparece en lo subido — no es una señal negativa",
-  },
-  {
-    nombre: "Titular de la cuenta",
-    estado: "contradice" as const,
-    valores: [
-      "Cotización: Tarimas del Bajío SA de CV",
-      "CLABE: Juan Carlos Ramírez López",
-    ],
-  },
-  {
-    nombre: "Domicilio",
-    estado: "coincide" as const,
-    detalle: "Av. Insurgentes Sur 1234, CDMX",
-  },
-  {
-    nombre: "Teléfono",
-    estado: "sin_evidencia" as const,
-    detalle: "No aparece en lo subido — no es una señal negativa",
-  },
-];
+// Commit 5: <CotejoUpload /> ahora hace el flujo completo — sube, valida,
+// lee con visión y coteja de verdad (cotejarDocumentos). Antes de subir
+// nada, muestra el mismo ejemplo estático de docs/mockup.png a modo de
+// vista previa; en cuanto hay un resultado real, lo reemplaza.
 
 export default function CotejoPage() {
   return (
@@ -54,42 +22,6 @@ export default function CotejoPage() {
 
       <div className="flex flex-1 flex-col gap-4 px-5 pt-3.5">
         <CotejoUpload />
-
-        <section className="flex flex-col gap-1.5">
-          <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
-            Vista previa · EJEMPLO
-          </h2>
-          {campos.map((campo) => (
-            <div
-              key={campo.nombre}
-              className={`flex flex-col gap-1 rounded-[9px] border px-2.5 py-2 ${
-                campo.estado === "contradice"
-                  ? "border-amber-200 bg-amber-50"
-                  : "border-border"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] font-semibold">{campo.nombre}</span>
-                <EstadoPill estado={campo.estado} />
-              </div>
-              {campo.valores ? (
-                campo.valores.map((v) => (
-                  <span key={v} className="text-[10.5px] text-amber-800">
-                    {v}
-                  </span>
-                ))
-              ) : (
-                <span
-                  className={`text-[10.5px] ${
-                    campo.estado === "sin_evidencia" ? "italic text-muted-2" : "text-muted"
-                  }`}
-                >
-                  {campo.detalle}
-                </span>
-              )}
-            </div>
-          ))}
-        </section>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-border px-5 pb-6 pt-3">
