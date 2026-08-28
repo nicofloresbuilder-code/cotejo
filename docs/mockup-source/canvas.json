@@ -1,0 +1,7 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 844, "title": "Cotejo" },
+    { "file": "Tablero.dc.html", "x": 470, "y": 0, "w": 390, "h": 844, "title": "Tablero de valor" }
+  ],
+  "launch": { "view": "canvas" }
+}

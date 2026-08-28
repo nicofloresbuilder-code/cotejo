@@ -265,11 +265,11 @@ Se le pegan capturas de cada pantalla en orden y se le pide que intente la tarea
 
 ---
 
-## 13. Mockup — PENDIENTE
+## 13. Mockup
 
-Generar con imagen y guardar como `docs/mockup.png`. Prompt listo para pegar:
+![Mockup de Cotejo: pantalla de cotejo y tablero de valor](mockup.png)
 
-> Mockup de interfaz móvil, dos pantallas verticales de teléfono lado a lado, español mexicano, estilo sobrio y profesional, tipografía sans-serif, fondo blanco, acentos en azul pizarra y gris. Pantalla izquierda titulada "Cotejo": arriba cuatro miniaturas pequeñas de documentos subidos etiquetadas "Cotización", "Constancia", "Perfil" y "CLABE"; debajo una tabla de tres columnas con filas para "Razón social", "RFC", "Titular de la cuenta", "Domicilio" y "Teléfono", donde cada fila muestra una etiqueta de estado: dos filas dicen "Coincide" en verde tenue, una fila dice "Contradice" en ámbar mostrando dos valores distintos uno debajo del otro, y dos filas dicen "Sin evidencia" en gris neutro con letra pequeña que dice "esto no es una señal negativa"; abajo una tarjeta con el título "Pídele esto" y un botón grande "Copiar para WhatsApp"; al pie una franja gris con texto pequeño "No verificamos contra el SAT ni contra ningún banco. Comparamos solo lo que subiste". Pantalla derecha titulada "Tablero de valor": tres tarjetas de métrica arriba con números grandes etiquetadas "Monto en riesgo", "Tiempo por cotejo" y "Cambió la acción", debajo una gráfica de barras simple y una tabla de tres filas etiquetadas "Producto", "Feature" e "Infraestructura". Sin logotipos de marcas reales, sin datos personales reales.
+Dos pantallas: **Cotejo** (izquierda) — 4 evidencias subidas, tabla de 5 campos con sus tres estados (2 *coincide*, 1 *contradice* con ambos valores mostrados, 2 *sin evidencia* marcados explícitamente como no negativos), tarjeta "Pídele esto" con botón "Copiar para WhatsApp", y el límite declarado al pie. **Tablero de valor** (derecha) — monto en riesgo, tiempo por cotejo y tasa de cambio de acción; distribución de resultados; comparación de los tres modelos de entrega. Datos de ejemplo, sin información real de ninguna persona. Fuente editable en `docs/mockup-source/`.
 
 ---
 
