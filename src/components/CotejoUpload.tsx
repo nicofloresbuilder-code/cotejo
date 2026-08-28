@@ -1,17 +1,33 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { subirEvidencias, type SubirEvidenciasResultado } from "@/app/actions/subirEvidencias";
+import { leerEvidencias, type LeerEvidenciasResultado } from "@/app/actions/leerEvidencias";
 import { MAX_EVIDENCIAS, TIPOS_PERMITIDOS } from "@/lib/validarEvidencias";
+import { CAMPOS_ENTIDAD } from "@/lib/vision/entidades";
 import { DocIcon } from "@/components/DocIcon";
 
-// Commit 3: subida real + validación real (cliente y servidor). Todavía NO
-// hay visión ni cotejo — eso es Commit 4/5. El resultado de este componente
-// es intencionalmente honesto sobre eso, en vez de fingir un cotejo real.
+const ETIQUETAS_CAMPO: Record<string, string> = {
+  razon_social: "Razón social",
+  nombre_persona_fisica: "Nombre (persona física)",
+  rfc: "RFC",
+  clabe: "CLABE",
+  banco: "Banco",
+  titular_cuenta: "Titular de la cuenta",
+  domicilio: "Domicilio",
+  telefono: "Teléfono",
+  regimen_fiscal: "Régimen fiscal",
+  folio: "Folio",
+  monto: "Monto",
+};
+
+// Commit 4: subida real + validación real + LECTURA REAL con la API de
+// Anthropic (un documento a la vez). Todavía NO existe el motor de cotejo
+// que compara los campos entre documentos — eso es Commit 5. Por ahora
+// esto muestra, honestamente, lo que el modelo extrajo de cada documento.
 export function CotejoUpload() {
   const [archivos, setArchivos] = useState<File[]>([]);
   const [erroresCliente, setErroresCliente] = useState<string[]>([]);
-  const [resultado, setResultado] = useState<SubirEvidenciasResultado | null>(null);
+  const [resultado, setResultado] = useState<LeerEvidenciasResultado | null>(null);
   const [enviando, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +59,7 @@ export function CotejoUpload() {
     const formData = new FormData();
     archivos.forEach((f) => formData.append("evidencias", f));
     startTransition(async () => {
-      const r = await subirEvidencias(formData);
+      const r = await leerEvidencias(formData);
       setResultado(r);
     });
   }
@@ -113,26 +129,60 @@ export function CotejoUpload() {
         onClick={cotejar}
         className="rounded-lg bg-accent px-3.5 py-2.5 text-[12.5px] font-semibold text-white disabled:opacity-40"
       >
-        {enviando ? "Validando…" : "Cotejar"}
+        {enviando ? "Leyendo con IA…" : "Cotejar"}
       </button>
       {archivos.length < 2 && (
         <p className="text-center text-[10px] text-muted-2">Sube al menos 2 evidencias.</p>
       )}
 
-      {resultado && resultado.ok && (
-        <div className="flex flex-col gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[10.5px] text-emerald-800">
-          <span className="font-semibold">✓ {resultado.archivos.length} evidencias válidas.</span>
-          <span className="text-emerald-700">
-            La lectura con IA y la tabla de cotejo real llegan en el próximo commit.
-          </span>
-        </div>
-      )}
       {resultado && !resultado.ok && (
         <ul className="flex flex-col gap-0.5 rounded-lg bg-red-50 px-2.5 py-2 text-[10px] text-red-700">
           {resultado.errores.map((e) => (
             <li key={e}>{e}</li>
           ))}
         </ul>
+      )}
+
+      {resultado && resultado.ok && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[10px] text-muted-2">
+            Lectura completada. El cotejo real (comparar estos campos entre documentos) llega en
+            el próximo commit — esto es lo que el modelo extrajo de cada uno.
+          </p>
+          {resultado.documentos.map((doc) => {
+            const camposConValor = CAMPOS_ENTIDAD.filter((c) => doc.entidades[c] !== null);
+            return (
+              <div
+                key={doc.archivo}
+                className={`flex flex-col gap-1 rounded-lg border px-2.5 py-2 text-[10.5px] ${
+                  doc.entidades.posible_inyeccion
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-border"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{doc.archivo}</span>
+                  {doc.entidades.posible_inyeccion && (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-700">
+                      Instrucción ignorada
+                    </span>
+                  )}
+                </div>
+                {doc.error && <span className="text-red-700">No se pudo leer: {doc.error}</span>}
+                {!doc.error && camposConValor.length === 0 && (
+                  <span className="italic text-muted-2">No se detectó ningún campo conocido.</span>
+                )}
+                {!doc.error &&
+                  camposConValor.map((c) => (
+                    <div key={c} className="flex justify-between gap-2 text-muted">
+                      <span className="text-muted-2">{ETIQUETAS_CAMPO[c]}</span>
+                      <span className="text-right">{doc.entidades[c]}</span>
+                    </div>
+                  ))}
+              </div>
+            );
+          })}
+        </div>
       )}
     </section>
   );
