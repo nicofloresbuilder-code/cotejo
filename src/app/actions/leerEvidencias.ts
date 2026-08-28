@@ -2,11 +2,13 @@
 
 import { validarEvidencias, type ArchivoEntrada } from "@/lib/validarEvidencias";
 import { extraerEntidades, type ExtraccionResultado } from "@/lib/vision/extraerEntidades";
+import { calcularCostoMxn } from "@/lib/costo";
 
 export type LeerEvidenciasResultado = {
   ok: boolean;
   errores: string[];
   documentos: ExtraccionResultado[];
+  costoVariableMxn: number; // suma real de todo el lote — ver src/lib/costo.ts
 };
 
 // Commit 4: valida (igual que subirEvidencias) y, si pasa, manda cada
@@ -25,7 +27,7 @@ export async function leerEvidencias(formData: FormData): Promise<LeerEvidencias
 
   const validacion = validarEvidencias(entrada);
   if (!validacion.ok) {
-    return { ok: false, errores: validacion.errores, documentos: [] };
+    return { ok: false, errores: validacion.errores, documentos: [], costoVariableMxn: 0 };
   }
 
   const nombresValidos = new Set(validacion.archivosValidos.map((a) => a.nombre));
@@ -42,5 +44,9 @@ export async function leerEvidencias(formData: FormData): Promise<LeerEvidencias
     }),
   );
 
-  return { ok: true, errores: [], documentos };
+  const inputTotal = documentos.reduce((s, d) => s + d.tokens.input, 0);
+  const outputTotal = documentos.reduce((s, d) => s + d.tokens.output, 0);
+  const costoVariableMxn = calcularCostoMxn(inputTotal, outputTotal);
+
+  return { ok: true, errores: [], documentos, costoVariableMxn };
 }

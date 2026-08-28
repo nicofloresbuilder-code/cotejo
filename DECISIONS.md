@@ -115,3 +115,20 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 - 27/27 tests, build y lint limpios.
 
 **Próximo paso:** Commit 7 — tablero de valor real en `/tablero` (leer agregados de `value_events` y `delivery_models`, nada hardcodeado), guardar un cotejo con Google Sign-in (`checks`, RLS), y deploy 2.
+
+## Sesión 7 — 2026-08-28
+
+**Qué se decidió:**
+- **Costo variable real por cotejo** (packet, Superficie B — Condición 3, la principal): en vez de estimar tokens de imagen con una fórmula, se captura `response.usage.input_tokens`/`output_tokens` de cada llamada REAL a la API de visión (`extraerEntidades.ts`) y se calcula el costo con el pricing real de Haiku 4.5 ($1.00 / $5.00 USD por millón de tokens input/output, consultado vía la skill `claude-api`, no de memoria) más un tipo de cambio aproximado documentado como tal (`src/lib/costo.ts`, función pura, 3 tests). Se muestra en vivo en la UI después de cada lectura ("Esta lectura con IA costó ≈$X MXN").
+- **Se propuso una migración para persistir ese costo en `value_events`** (`supabase/migrations/0002_costo_variable.sql`) — Nicolás pidió posponerla. Se dejó el archivo de migración listo mi no aplicado, y el tablero lo dice explícitamente ("Costo variable real por cotejo: pendiente de activar") en vez de fingir el dato o esconder el hueco.
+- `/tablero` reescrito de cero como Server Component que lee `value_events` y `delivery_models` directo de Supabase (RLS los deja de lectura pública) — cero números hardcodeados. Agrega: monto en riesgo acumulado, tiempo promedio, tasa de cambio de acción (proxy documentado: % de eventos donde `accion !== 'pague'`, porque no hay forma de saber qué habría hecho el usuario sin la herramienta), distribución de estados agregada sobre TODOS los campos cotejados, y una tabla nueva de disposición a pagar declarada que el mockup original no tenía pero el packet sí pedía (sección 4, Superficie B).
+- Modelos de entrega: se dejó de mostrar el badge de estado inventado del Commit 1 ("Sostenido por datos" / "Requiere alianza") — con 1-2 cotejos de prueba no hay base real para calcular eso. Ahora muestra la condición de viabilidad tal cual vive en la tabla `delivery_models`, sin inventar un veredicto.
+- `useAuthUser.ts`: hook compartido entre `AuthButton` y `CotejoUpload` — antes cada uno iba a manejar su propio estado de sesión por separado.
+- "Guardar este cotejo" (`guardarCheck.ts`) usa el cliente normal (respeta RLS), nunca el admin — a diferencia de `guardarEventoValor`. Solo aparece si hay sesión; como Google Sign-in sigue sin activarse (decisión de la Sesión 2), el botón está listo pero no se ha podido probar de extremo a extremo todavía — pendiente documentado, no fingido.
+
+**Verificado — con la API real, con 2 cotejos reales corridos en el navegador:**
+- Cotejo 1 (todo `sin_evidencia`, monto $38,000, acción "Pedí más evidencia") + Cotejo 2 (razón social y RFC coinciden, sin monto, acción "Pagué") → el tablero mostró exactamente los agregados correctos a mano: monto $38,000 (solo el que lo declaró), tiempo promedio = (128+22)/2 = 75s, tasa de cambio = 50% (1 de 2 no fue "pagué"), distribución 20%/0%/80% sobre 10 campos totales, disposición a pagar 50%/50%. Cero errores de cálculo.
+- Costo real mostrado en pantalla: ≈$0.049 MXN por una lectura de 2 documentos — número real, no inventado.
+- 30/30 tests, build y lint limpios.
+
+**Próximo paso — deploy 2 y luego Commit 8:** desplegar esta sesión, y después el pase mecánico de los 12 casos del packet + la prueba adversarial de equidad.

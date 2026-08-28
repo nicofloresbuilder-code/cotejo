@@ -11,6 +11,7 @@ export type ExtraccionResultado = {
   archivo: string;
   entidades: EntidadesDocumento;
   error?: string; // fallo de red/API en ESTE documento — no debe tumbar a los demás
+  tokens: { input: number; output: number }; // uso REAL — para el costo variable real (src/lib/costo.ts)
 };
 
 /**
@@ -50,17 +51,28 @@ export async function extraerEntidades(
       ],
     });
 
+    const tokens = {
+      input: respuesta.usage.input_tokens,
+      output: respuesta.usage.output_tokens,
+    };
+
     const bloqueTexto = respuesta.content.find((b) => b.type === "text");
     if (!bloqueTexto || bloqueTexto.type !== "text") {
-      return { archivo, entidades: { ...ENTIDADES_VACIAS }, error: "El modelo no regresó texto." };
+      return {
+        archivo,
+        entidades: { ...ENTIDADES_VACIAS },
+        error: "El modelo no regresó texto.",
+        tokens,
+      };
     }
 
-    return { archivo, entidades: parsearRespuestaVision(bloqueTexto.text) };
+    return { archivo, entidades: parsearRespuestaVision(bloqueTexto.text), tokens };
   } catch (err) {
     return {
       archivo,
       entidades: { ...ENTIDADES_VACIAS },
       error: err instanceof Error ? err.message : "Error desconocido al leer el documento.",
+      tokens: { input: 0, output: 0 },
     };
   }
 }

@@ -3,10 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import { leerEvidencias, type LeerEvidenciasResultado } from "@/app/actions/leerEvidencias";
 import { guardarEventoValor } from "@/app/actions/guardarEventoValor";
+import { guardarCheck } from "@/app/actions/guardarCheck";
 import { ACCIONES, DISPOSICIONES_PAGO, type Accion, type DisposicionPago } from "@/lib/eventoValor";
 import { MAX_EVIDENCIAS, TIPOS_PERMITIDOS } from "@/lib/validarEvidencias";
 import { cotejarDocumentos, CAMPOS_CANONICOS, type ResultadoCampo } from "@/lib/cotejo/cotejarDocumentos";
 import { generarMensajeWhatsApp } from "@/lib/mensajes/generarMensajeWhatsApp";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { EstadoPill } from "@/components/EstadoPill";
 import { DocIcon } from "@/components/DocIcon";
 
@@ -120,9 +122,16 @@ export function CotejoUpload() {
   const [errorEvento, setErrorEvento] = useState<string | null>(null);
   const [guardandoEvento, startTransitionEvento] = useTransition();
 
+  const { user } = useAuthUser();
+  const [checkGuardado, setCheckGuardado] = useState(false);
+  const [errorCheck, setErrorCheck] = useState<string | null>(null);
+  const [guardandoCheck, startTransitionCheck] = useTransition();
+
   function reiniciarDeclaracion() {
     setAccionSeleccionada(null);
     setEventoGuardado(false);
+    setCheckGuardado(false);
+    setErrorCheck(null);
     setErrorEvento(null);
   }
 
@@ -217,6 +226,18 @@ export function CotejoUpload() {
         setEventoGuardado(true);
       } else {
         setErrorEvento(r.error ?? "No se pudo guardar el evento.");
+      }
+    });
+  }
+
+  function guardarCotejo() {
+    if (!resultadoCotejo) return;
+    startTransitionCheck(async () => {
+      const r = await guardarCheck(resultadoCotejo, archivos.length);
+      if (r.ok) {
+        setCheckGuardado(true);
+      } else {
+        setErrorCheck(r.error ?? "No se pudo guardar.");
       }
     });
   }
@@ -321,6 +342,12 @@ export function CotejoUpload() {
         {CAMPOS_CANONICOS.map((campo) => (
           <FilaCampo key={campo} campo={campo} resultado={(resultadoCotejo ?? EJEMPLO)[campo]} />
         ))}
+        {resultado && resultado.ok && (
+          <p className="text-[9.5px] text-muted-2">
+            Esta lectura con IA costó ≈${resultado.costoVariableMxn.toFixed(3)} MXN (calculado del
+            consumo real de tokens, no estimado).
+          </p>
+        )}
       </section>
 
       <div className="flex flex-col gap-1.5 rounded-[10px] border border-border bg-gray-50 p-3">
@@ -386,8 +413,20 @@ export function CotejoUpload() {
       )}
 
       {eventoGuardado && (
-        <div className="rounded-[10px] border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
-          Gracias — esto alimenta el tablero de valor, sin ningún dato de la contraparte.
+        <div className="flex flex-col gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
+          <p>Gracias — esto alimenta el tablero de valor, sin ningún dato de la contraparte.</p>
+          {user && !checkGuardado && (
+            <button
+              type="button"
+              disabled={guardandoCheck}
+              onClick={guardarCotejo}
+              className="self-start rounded-lg border border-emerald-700 px-2.5 py-1.5 text-[10.5px] font-semibold text-emerald-800 disabled:opacity-40"
+            >
+              {guardandoCheck ? "Guardando…" : "Guardar este cotejo en mi cuenta"}
+            </button>
+          )}
+          {checkGuardado && <p className="font-semibold">✓ Cotejo guardado en tu cuenta.</p>}
+          {errorCheck && <p className="text-red-700">{errorCheck}</p>}
         </div>
       )}
     </section>

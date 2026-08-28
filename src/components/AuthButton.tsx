@@ -1,28 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 // Botón chico de "Iniciar sesión con Google" / "Cerrar sesión". El login
 // nunca es requisito para cotejar — solo para guardar un cotejo (Commit 7).
 export function AuthButton() {
-  const [user, setUser] = useState<User | null>(null);
-  const [cargando, setCargando] = useState(true);
+  const { user, cargando } = useAuthUser();
   const supabase = createClient();
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-      setCargando(false);
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, [supabase]);
 
   if (cargando) return null;
 
