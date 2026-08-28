@@ -27,3 +27,23 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 **Deploy 1:** https://cotejo-psi.vercel.app — `/` y `/tablero` responden 200.
 
 **Próximo paso:** Commit 2 — migración de Supabase (`checks`, `value_events`, `delivery_models` con RLS) + Sign in with Google.
+
+## Sesión 2 — 2026-08-28
+
+**Qué se decidió:**
+- Proyecto de Supabase creado a mano por Nicolás (`btockirecdxmkuztokwr`) — la contraseña de la base de datos nunca se compartió conmigo a propósito. La migración (`supabase/migrations/0001_init.sql`, copia exacta del bloque SQL de `BUILD_PROMPT.md`) se corrió a mano en el SQL Editor del dashboard, no por CLI, precisamente por no tener esa contraseña.
+- URL + anon key + service_role key configuradas como env vars en Vercel (`production`, `preview`, `development` — las 9 combinaciones) vía `vercel env add`, y en `.env.local` (gitignored) para desarrollo local. `NEXT_PUBLIC_SUPABASE_ANON_KEY` se agregó con `--type config` explícito — Vercel la marca por default como posible credencial por el prefijo `NEXT_PUBLIC_` y el que "parece" un secreto, pero es la llave anon: está diseñada para ser pública, la protege RLS.
+- Wiring de `@supabase/supabase-js` + `@supabase/ssr`: `src/lib/supabase/client.ts` (browser), `server.ts` (Server Components/Actions, respeta RLS), `admin.ts` (service role, con `import "server-only"` para que el build truene si algo lo mete a un bundle de cliente — solo se va a usar para insertar en `value_events` en el Commit 6). `src/proxy.ts` refresca la sesión en cada request (el nombre `proxy.ts` en vez de `middleware.ts` es la convención de esta versión de Next — confirmado en `node_modules/next/dist/esm/server/web/adapter.js`, ambos nombres siguen funcionando).
+- Botón de "Iniciar sesión con Google" (`AuthButton.tsx`, client component) agregado al pie de la pantalla de Cotejo, chico y aparte del flujo principal — el login nunca es requisito para cotejar, solo para guardar (packet, sección 4, paso 6).
+- El proveedor de Google en sí (Supabase Auth → Providers → Google, con un client ID/secret de Google Cloud) queda pendiente — es un sub-paso aparte, no bloquea el resto del build.
+
+**Por qué:**
+- Nunca pedir la contraseña de la base de datos si hay una vía alternativa (SQL Editor manual) que no la necesita — la superficie de lo que un agente puede tocar se mantiene chica a propósito.
+- `admin.ts` separado y marcado `server-only` en vez de un solo cliente "todo terreno": la Condición de seguridad #1 del piso (sin secretos expuestos) se vuelve un error de build, no una promesa de que "me voy a acordar de no importarlo mal".
+
+**Verificado:**
+- `curl` a `/rest/v1/delivery_models` con la anon key regresa las 3 filas sembradas (lectura pública funcionando).
+- `curl` a `/rest/v1/checks` y `/rest/v1/value_events` con la anon key regresa `[]` (RLS bloqueando lo que debe bloquear; no hay filas todavía para probar el caso "otro user_id no puede leer las mías" — eso se prueba de verdad en el Commit 6/7 con datos reales).
+- `npm run build` y `npm run lint` limpios. Probado visualmente en viewport móvil (375×812): el botón de login no rompe el layout del mockup.
+
+**Próximo paso:** configurar el proveedor de Google en Supabase Auth (necesita un OAuth client de Google Cloud) para que el botón de login funcione de extremo a extremo. Después: Commit 3 (subida y validación de evidencias).

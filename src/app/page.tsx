@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EstadoPill } from "@/components/EstadoPill";
 import { CardIcon, DocIcon, PersonIcon } from "@/components/DocIcon";
+import { AuthButton } from "@/components/AuthButton";
 
 // Commit 1: layout estático que replica docs/mockup.png, sin lógica todavía.
 // Los datos de abajo son de EJEMPLO — Commits 3-6 los reemplazan por
@@ -127,12 +128,15 @@ export default function CotejoPage() {
             No verificamos contra el SAT ni contra ningún banco. Comparamos solo lo que subiste.
           </p>
         </div>
-        <Link
-          href="/tablero"
-          className="mt-1 text-center text-[11px] font-semibold text-accent underline underline-offset-2"
-        >
-          Ver el tablero de valor →
-        </Link>
+        <div className="mt-1 flex flex-col items-center gap-1.5">
+          <Link
+            href="/tablero"
+            className="text-[11px] font-semibold text-accent underline underline-offset-2"
+          >
+            Ver el tablero de valor →
+          </Link>
+          <AuthButton />
+        </div>
       </div>
     </main>
   );
