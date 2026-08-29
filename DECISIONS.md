@@ -132,3 +132,52 @@ Bitácora de decisiones de build. Se actualiza al cierre de cada sesión (`DECIS
 - 30/30 tests, build y lint limpios.
 
 **Próximo paso — deploy 2 y luego Commit 8:** desplegar esta sesión, y después el pase mecánico de los 12 casos del packet + la prueba adversarial de equidad.
+
+## Sesión 8 — 2026-08-28 — Commit 8: pase mecánico + prueba de equidad
+
+### Pase mecánico — los 12 casos de la sección 12 del packet
+
+| # | Caso | Resultado | Evidencia |
+|---|---|---|---|
+| 1 | Todo coincide | ✅ PASA | Sesión 5 (real, RFC/razón social/domicilio coincidiendo con procedencia citada) |
+| 2 | Contradicción de titular | ✅ PASA | Mismo mecanismo que #3, verificado con el campo RFC en Sesión 5 — `contradice` muestra ambos valores literales con su fuente |
+| 3 | RFC cruzado | ✅ PASA | Sesión 5 (cotización + constancia con RFC distinto a propósito → contradice real, con ambos documentos citados) |
+| 4 | Evidencia parcial | ✅ PASA | Sesión 6 (2 documentos sin campos en común → 5/5 `sin_evidencia`, cero campos en rojo) |
+| 5 | Documento ilegible | 🐛 **Encontrado, arreglado y verificado esta sesión** — ver "Bug encontrado" abajo |
+| 6 | Archivo no permitido | ✅ PASA | Sesión 3 (6MB + `.exe` rechazados con mensaje claro, cliente y servidor, sin crash) |
+| 7 | Inyección por imagen | ✅ PASA | Sesión 4 (API real — `posible_inyeccion:true`, instrucción no obedecida) |
+| 8 | Frontera de evidencia | ✅ PASA | `grep` de esta sesión sobre todo `src/app` y `src/components`: cero coincidencias de score/veredicto/confiabilidad en el UI renderizado |
+| 9 | RLS (usuario B lee check de A) | ✅ PASA | **Nuevo esta sesión** — ver "RLS con usuarios reales" abajo |
+| 10 | Anonimato del tablero | ✅ PASA | Sesión 6 (fila real en `value_events`, cero campos identificables de la contraparte) |
+| 11 | Límite declarado siempre visible | ✅ PASA | Confirmado esta sesión: el texto vive en `page.tsx` fuera de cualquier condicional — se renderiza siempre, sin importar el estado del cotejo |
+| 12 | Tablero con 20 cotejos sembrados | ✅ PASA | **Nuevo esta sesión** — ver "20 cotejos sembrados" abajo |
+
+**12/12 casos pasan.** El único que falló al correrlo de verdad (#5) se documenta completo abajo, con antes/después, tal como pide el criterio de aceptación del ship.
+
+### Bug encontrado, arreglado y redesplegado (Test #5 — documento ilegible)
+
+**Antes:** se subió un documento genuinamente ilegible (ruido puro, generado con PIL, sin ningún texto real) junto con uno normal. La API de visión regresó, correctamente, las 11 entidades en `null`. Pero la UI no tenía forma de distinguir "esta foto no sirvió, pide otra" de "este documento simplemente no menciona estos 5 campos" — ambos casos se veían idénticos: puro `sin_evidencia`. Verificado en el navegador con el archivo `ilegible.png` antes del fix: la tabla mostraba los 5 campos en `sin_evidencia` sin ningún aviso.
+
+**Causa:** el prompt de visión nunca le pedía al modelo que distinguiera "no pude leer nada" de "no menciona este dato".
+
+**Arreglo:** se agregó `documento_ilegible: boolean` al schema de `EntidadesDocumento` y al system prompt (`src/lib/vision/entidades.ts`), con una regla explícita para no confundirlo con "el documento simplemente no trae este campo". `CotejoUpload.tsx` ahora muestra un aviso ámbar, separado de la tabla de cotejo, listando los archivos ilegibles y pidiendo una foto más clara. 2 tests nuevos (32/32 en total).
+
+**Después:** mismo `ilegible.png`, mismo `normal.png`, mismo cotejo — ahora la pantalla muestra primero *"No pudimos leer este documento: ilegible.png — Prueba con una foto más clara, sin cortes ni borrosa — con buena luz y de frente."*, y luego la tabla de cotejo (que sigue mostrando `sin_evidencia` para los campos, correctamente — el fix es informativo, no cambia el cotejo). Verificado en vivo.
+
+### RLS con usuarios reales (Test #9)
+
+Sin Google Sign-in activado no había forma de loguearse a mano en el navegador para probar el aislamiento entre dos usuarios. Se escribió `supabase/verificar-rls-checks.mjs`: crea dos usuarios reales de Supabase Auth (vía admin API), inicia sesión como cada uno con contraseña, inserta un `check` como A, y confirma que B — con una sesión real, autenticada, no simulada — recibe **0 filas** al pedir el check de A, mientras A sigue viendo su propia fila. `PASA`. El script borra los usuarios y el check de prueba al terminar — no deja nada de prueba en la tabla `checks`.
+
+### 20 cotejos sembrados (Test #12)
+
+`supabase/seed-value-events.mjs` — 20 filas sintéticas con un PRNG de semilla fija (reproducible), insertadas con la service role key. Con las 2 filas reales de sesiones anteriores, el tablero real (`/tablero`) ahora muestra **22 cotejos registrados**, con monto acumulado, tiempo promedio, tasa de cambio de acción (73%), distribución de estados y disposición a pagar — todo calculado en vivo, no hardcodeado. Verificado en el navegador.
+
+### Prueba adversarial de equidad (cláusula sombra)
+
+Ver **[`PERSONA.md`](PERSONA.md)** para el reporte completo. Resumen: **la hipótesis del packet NO se refuta** — los 6 casos informales (persona física, sin factura, cuenta del cónyuge, sin presencia digital, constancia vieja, negocio familiar) cayeron en `sin_evidencia` en promedio 4.67 de 5 campos, contra 2.00 de 5 en los 6 casos formales, con **cero contradicciones reales fabricadas** en ningún caso. No es un sesgo del motor — es estructural (el papeleo formal repite los mismos campos en dos documentos; el informal no) — pero el resultado visual completo ("todo gris" vs. "todo verde") es exactamente el tipo de señal adversa por forma de hacer negocios que la Condición 4 prohíbe. Se corrigió el diseño visual (aviso que aparece *antes* de la tabla cuando ≥3 de 5 campos son `sin_evidencia`, explicando que es normal con proveedores informales) y se documentó el cambio — tal como exige el packet cuando la hipótesis no se refuta.
+
+También se encontró, investigando dos contradicciones inesperadas en el grupo formal, un límite real de OCR no determinista (el modelo leyó "Illuminacion" con una L de más en una sola pasada, sobre un texto fuente idéntico) — documentado como límite conocido en `PERSONA.md`, sin corregirlo apurado bajo presión de tiempo (cambiar la comparación a tolerancia difusa es una decisión de producto que merece su propia sesión).
+
+**Verificado:** 32/32 tests, build y lint limpios. Deploy pendiente de confirmar al final de esta sesión.
+
+**Próximo paso:** el resto de la tarea vive fuera de este repo — persona test de Rocío (conversación nueva, no la hace el coding agent), video demo, y los entregables del dropbox del curso (`DEMO`, `PACKET.pdf`, `PERSONA.pdf`, `BUILDCHAT.pdf`).

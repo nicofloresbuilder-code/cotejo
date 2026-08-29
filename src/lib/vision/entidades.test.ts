@@ -52,3 +52,13 @@ test("posible_inyeccion con valor no booleano se normaliza a false", () => {
   const r = parsearRespuestaVision('{"posible_inyeccion":"true"}');
   assert.equal(r.posible_inyeccion, false);
 });
+
+test("documento_ilegible: true se detecta (Test #5 del packet)", () => {
+  const r = parsearRespuestaVision('{"documento_ilegible":true}');
+  assert.equal(r.documento_ilegible, true);
+});
+
+test("documento_ilegible con valor no booleano se normaliza a false", () => {
+  const r = parsearRespuestaVision('{"documento_ilegible":"si"}');
+  assert.equal(r.documento_ilegible, false);
+});

@@ -187,6 +187,26 @@ export function CotejoUpload() {
 
   const mensaje = resultadoCotejo ? generarMensajeWhatsApp(resultadoCotejo) : MENSAJE_EJEMPLO;
 
+  // Test #5 del packet: un documento ilegible NO debe verse igual que uno
+  // legible que simplemente no trae esos campos — se avisa aparte, no se
+  // esconde dentro de "sin evidencia".
+  const documentosIlegibles =
+    resultado && resultado.ok
+      ? resultado.documentos.filter((d) => d.entidades.documento_ilegible).map((d) => d.archivo)
+      : [];
+
+  // Corrección de diseño visual tras la prueba adversarial de equidad
+  // (packet, sección 12): con proveedores informales (WhatsApp, sin
+  // papeleo redundante) la mayoría de los campos caen naturalmente en
+  // "sin evidencia" — no por ningún sesgo del cotejo, sino porque
+  // simplemente no hay un segundo documento que repita el dato. Sin este
+  // aviso, un lector no entrenado puede leer "todo en gris" como
+  // sospechoso aunque cada fila diga individualmente que no lo es. Ver
+  // PERSONA.md.
+  const sinEvidenciaMayoria =
+    resultadoCotejo &&
+    CAMPOS_CANONICOS.filter((c) => resultadoCotejo[c].estado === "sin_evidencia").length >= 3;
+
   async function copiarMensaje() {
     if (!mensaje) return;
     try {
@@ -334,6 +354,24 @@ export function CotejoUpload() {
           </ul>
         )}
       </div>
+
+      {documentosIlegibles.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10.5px] text-amber-800">
+          <span className="font-semibold">
+            No pudimos leer {documentosIlegibles.length === 1 ? "este documento" : "estos documentos"}:{" "}
+            {documentosIlegibles.join(", ")}
+          </span>
+          <span>Prueba con una foto más clara, sin cortes ni borrosa — con buena luz y de frente.</span>
+        </div>
+      )}
+
+      {sinEvidenciaMayoria && (
+        <div className="rounded-lg bg-gray-100 px-2.5 py-2 text-[10.5px] text-muted">
+          La mayoría de estos datos no aparecen en lo que subiste — es normal con proveedores que
+          cotizan por WhatsApp o no manejan factura. Ninguno de estos campos es una señal
+          negativa; solo pide lo que falta con el mensaje de abajo.
+        </div>
+      )}
 
       <section className="flex flex-col gap-1.5">
         <h2 className="text-[10.5px] font-bold uppercase tracking-wide text-muted-2">
