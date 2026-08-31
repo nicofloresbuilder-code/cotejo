@@ -9,7 +9,9 @@ Un *payer-and-value test*: antes de que un dueño de negocio mexicano mande un a
 
 📋 Packet listo — ver [`docs/PACKET.md`](docs/PACKET.md), mockup en [`docs/mockup.png`](docs/mockup.png).
 🤖 Implementation prompt listo — ver [`BUILD_PROMPT.md`](BUILD_PROMPT.md).
-🧑‍💻 Build: **8/8 commits del `BUILD_PROMPT.md` hechos** (scaffold, Supabase/Auth, subida/validación, visión, cotejo real, evento de valor, tablero real, pase mecánico + prueba de equidad). Live: **https://cotejo-psi.vercel.app**
+🧑‍💻 Build: **8/8 commits del `BUILD_PROMPT.md` hechos** (scaffold, Supabase/Auth, subida/validación, visión, cotejo real, evento de valor, tablero real, pase mecánico + prueba de equidad), más una página de inicio que explica el producto. Live: **https://cotejo-psi.vercel.app**
+
+**Rutas:** `/` explica qué es Cotejo · `/cotejar` es la herramienta · `/tablero` es el tablero de valor.
 📓 Bitácora de sesiones: [`DECISIONS.md`](DECISIONS.md) · Prueba de equidad: [`PERSONA.md`](PERSONA.md)
 🔜 Pendiente (fuera del repo): Google Sign-in, persona test de Rocío, video demo, entregables del curso.
 

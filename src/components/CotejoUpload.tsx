@@ -63,8 +63,10 @@ const EJEMPLO: Record<string, ResultadoCampo> = {
   telefono: { estado: "sin_evidencia", valores: [] },
 };
 
+// Sin comillas propias — el JSX ya las pone alrededor, igual que con un
+// mensaje real generado por generarMensajeWhatsApp().
 const MENSAJE_EJEMPLO =
-  '"Antes de pasar el anticipo, ¿me confirmas el RFC y el teléfono a los que sale la factura? Solo para tener todo parejo de mi lado."';
+  "Antes de pasar el anticipo, ¿me confirmas el RFC y el teléfono a los que sale la factura? Solo para tener todo parejo de mi lado.";
 
 function FilaCampo({ campo, resultado }: { campo: string; resultado: ResultadoCampo }) {
   return (

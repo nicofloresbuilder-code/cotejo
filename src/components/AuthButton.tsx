@@ -29,7 +29,13 @@ export function AuthButton() {
       onClick={() =>
         supabase.auth.signInWithOAuth({
           provider: "google",
-          options: { redirectTo: `${window.location.origin}/auth/callback` },
+          options: {
+            // Regresa a la pantalla donde estaba, no al inicio — si estaba
+            // a media captura, perder el contexto es perder el cotejo.
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+              window.location.pathname,
+            )}`,
+          },
         })
       }
       className="text-[11px] font-semibold text-accent underline underline-offset-2"

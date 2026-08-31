@@ -93,7 +93,7 @@ export default async function TableroPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-5 text-center">
           <p className="text-[12.5px] text-muted">
             Todavía no hay cotejos registrados. Ve a{" "}
-            <Link href="/" className="font-semibold text-accent underline underline-offset-2">
+            <Link href="/cotejar" className="font-semibold text-accent underline underline-offset-2">
               Cotejo
             </Link>{" "}
             y haz el primero.
@@ -178,7 +178,7 @@ export default async function TableroPage() {
       )}
 
       <div className="px-5 pb-6">
-        <Link href="/" className="text-[11px] font-semibold text-accent underline underline-offset-2">
+        <Link href="/cotejar" className="text-[11px] font-semibold text-accent underline underline-offset-2">
           ← Volver a Cotejo
         </Link>
       </div>

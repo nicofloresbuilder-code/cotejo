@@ -181,3 +181,18 @@ También se encontró, investigando dos contradicciones inesperadas en el grupo 
 **Verificado:** 32/32 tests, build y lint limpios. Deploy pendiente de confirmar al final de esta sesión.
 
 **Próximo paso:** el resto de la tarea vive fuera de este repo — persona test de Rocío (conversación nueva, no la hace el coding agent), video demo, y los entregables del dropbox del curso (`DEMO`, `PACKET.pdf`, `PERSONA.pdf`, `BUILDCHAT.pdf`).
+
+## Sesión 9 — 2026-08-30 — Página de inicio
+
+**Qué se decidió:**
+- **Hallazgo de usabilidad, del propio Nicolás:** al abrir la app en frío dijo textualmente *"la verdad no entiendo de qué se trata Cotejo"*. Esto es un dato duro, no una queja menor: si quien encargó el producto no puede decir qué hace al verlo, un usuario nuevo tampoco. La app arrancaba directo en la pantalla de subir archivos, sin una sola línea de qué es ni para qué sirve. Es, de facto, un resultado de persona test antes del persona test formal.
+- Se reestructuraron las rutas: `/` ahora es una **página de inicio explicativa**, la herramienta se movió a `/cotejar`, y `/tablero` se queda igual. El header de `/cotejar` lleva un enlace "¿Qué es esto?" de regreso a la explicación.
+- La página de inicio cubre, en orden: el momento exacto de uso (antes de un SPEI a un proveedor nuevo), qué hace en 3 pasos, **qué significan los tres estados** (con las mismas etiquetas visuales de la herramienta real, reusando `EstadoPill` para que el usuario reconozca lo que ya vio explicado), y una sección explícita de **"Qué no hace Cotejo"** — no consulta al SAT ni a ningún registro, no califica al proveedor, no guarda documentos, no mueve dinero. Esa última sección es la Condición 5 del packet convertida en copy de producto, no en letra chica.
+- Se mantuvo la columna de 420px del resto de la app: el producto es para el celular de Rocío, no para escritorio.
+
+**Detalles corregidos de paso:**
+- **Bug de comillas dobles:** el mensaje de ejemplo de "Pídele esto" se veía como `“"Antes de pasar el anticipo…"”` — la constante `MENSAJE_EJEMPLO` traía sus propias comillas y el JSX les agregaba otro par. Se quitaron de la constante, para que se comporte igual que un mensaje real generado por `generarMensajeWhatsApp()`.
+- **Login perdía el contexto:** `signInWithOAuth` redirigía siempre a `/`, que ahora es la landing — alguien que iniciaba sesión a media captura terminaba en la portada, perdiendo el cotejo. Ahora pasa `?next=` con la ruta actual.
+- **Falso positivo del Test #8:** la frase "no hay puntaje, ni semáforo…" en la sección *Qué no hace* disparaba el grep de lenguaje prohibido, aunque es una **negación** (dice que el producto no lo tiene). Se reformuló a "ni calificación" para que ese grep siga siendo una alarma limpia y confiable, en vez de tener que razonar caso por caso si cada hit es real. El test como tripwire vale más que la palabra.
+
+**Verificado:** flujo completo real en el navegador (landing → CTA → herramienta → 2 documentos EJEMPLO → visión real → cotejo real). Test #8 limpio (cero lenguaje de veredicto en texto renderizado), Test #11 intacto (la leyenda del límite sigue siempre visible en `/cotejar`). 32/32 tests, build y lint limpios.
